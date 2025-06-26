@@ -54,6 +54,10 @@ int fs_touch(const char *name)
 {
     Dir *cwd = dir_get_cwd();
     if (!cwd || !name || !*name || strchr(name,'/')) return -1;
+    if (!auth_has_perm_mode(cwd->owner,cwd->group,cwd->perms,P_WRITE)){
+        puts("Permissão negada");
+        return -1;
+    }
     if (g_hash_table_contains(cwd->files, name))     return -1;
 
     g_hash_table_insert(cwd->files, g_strdup(name), _new_fcb(name));
@@ -101,6 +105,12 @@ int fs_echo(const char *name, const char *txt, int append)
 /*──────────────────── leitura (cat) ───────────────────────*/
 int fs_cat(const char *name)
 {
+    Dir *cwd = dir_get_cwd();
+    if (!cwd || !auth_has_perm_mode(cwd->owner,cwd->group,cwd->perms,
+                                    P_READ|P_EXEC)){
+        puts("Permissão negada");
+        return -1;
+    }
     FCB *f = _lookup(name);
     if (!f) return -1;
     if (!auth_has_perm(f, P_READ)) {
@@ -126,12 +136,23 @@ int fs_cat(const char *name)
 int fs_rm(const char *name)
 {
     Dir *cwd = dir_get_cwd();
-    return (cwd && g_hash_table_remove(cwd->files,name)) ? 0 : -1;
+    if (!cwd ||
+        !auth_has_perm_mode(cwd->owner,cwd->group,cwd->perms,P_WRITE)){
+        puts("Permissão negada");
+        return -1;
+    }
+    return g_hash_table_remove(cwd->files,name) ? 0 : -1;
 }
 
 /*──────────────────── cópia --------------------------------*/
 int fs_cp(const char *src, const char *dst)
 {
+    Dir *cwd = dir_get_cwd();
+    if (!cwd ||
+        !auth_has_perm_mode(cwd->owner,cwd->group,cwd->perms,P_WRITE)){
+        puts("Permissão negada");
+        return -1;
+    }
     if (_lookup(dst)) return -1;
     FCB *orig = _lookup(src); if (!orig) return -1;
     if (!auth_has_perm(orig,P_READ)) { puts("Permissão negada"); return -1; }
@@ -162,6 +183,10 @@ int fs_mv(const char *src, const char *dst)
 {
     Dir *cwd = dir_get_cwd();
     if (!cwd || _lookup(dst)) return -1;
+    if (!auth_has_perm_mode(cwd->owner,cwd->group,cwd->perms,P_WRITE)){
+        puts("Permissão negada");
+        return -1;
+    }
     gpointer v = g_hash_table_lookup(cwd->files, src);
     if (!v) return -1;
 
